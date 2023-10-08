@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Notifications;
+
+use App\Models\Torrent;
+use App\Models\User;
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
+
+class UserPreWarning extends Notification
+{
+    use Queueable;
+
+    /**
+     * Create a new notification instance.
+     */
+    public function __construct(public User $user, public Torrent $torrent)
+    {
+    }
+
+    /**
+     * Get the notification's delivery channels.
+     *
+     * @return array<int, string>
+     */
+    public function via(object $notifiable): array
+    {
+        return ['database', 'mail'];
+    }
+
+    /**
+     * Get the mail representation of the notification.
+     */
+    public function toMail(object $notifiable): MailMessage
+    {
+        $profileUrl = href_profile($this->user);
+
+        return (new MailMessage())
+            ->greeting('Hit and Run Pre Warning!')
+            ->line('You have received a hit and run pre warning on one or more torrents!')
+            ->action('View Unsatisfied Torrents to seed off your warnings or wait until they expire!', $profileUrl)
+            ->line('Thank you for using 🚀'.config('other.title'));
+    }
+
+    /**
+     * Get the array representation of the notification.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(object $notifiable): array
+    {
+        return [
+            'title' => $this->torrent->name.' Pre Warning Received',
+            'body'  => 'You have received an automated PRE WARNING from the system because you failed to follow the Hit and Run rules in relation to Torrent '.$this->torrent->name,
+            'url'   => sprintf('/torrents/%s', $this->torrent->id),
+        ];
+    }
+}

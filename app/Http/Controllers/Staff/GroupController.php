@@ -1,0 +1,97 @@
+<?php
+/**
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
+ */
+
+namespace App\Http\Controllers\Staff;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StoreGroupRequest;
+use App\Http\Requests\Staff\UpdateGroupRequest;
+use App\Models\Forum;
+use App\Models\Group;
+use App\Models\Permission;
+use App\Models\User;
+use App\Services\Unit3dAnnounce;
+use Illuminate\Support\Str;
+
+/**
+ * @see \Tests\Feature\Http\Controllers\Staff\GroupControllerTest
+ */
+class GroupController extends Controller
+{
+    /**
+     * Display All Groups.
+     */
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    {
+        return view('Staff.group.index', [
+            'groups' => Group::orderBy('position')->get(),
+        ]);
+    }
+
+    /**
+     * Group Add Form.
+     */
+    public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    {
+        return view('Staff.group.create');
+    }
+
+    /**
+     * Store A New Group.
+     */
+    public function store(StoreGroupRequest $request): \Illuminate\Http\RedirectResponse
+    {
+        $group = Group::create(['slug' => Str::slug($request->name)] + $request->validated());
+
+        foreach (Forum::pluck('id') as $collection) {
+            Permission::create([
+                'forum_id'    => $collection,
+                'group_id'    => $group->id,
+                'show_forum'  => 0,
+                'read_topic'  => 0,
+                'reply_topic' => 0,
+                'start_topic' => 0,
+            ]);
+        }
+
+        return to_route('staff.groups.index')
+            ->withSuccess('Group Was Created Successfully!');
+    }
+
+    /**
+     * Group Edit Form.
+     */
+    public function edit(Group $group): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    {
+        return view('Staff.group.edit', [
+            'group' => $group,
+        ]);
+    }
+
+    /**
+     * Edit A Group.
+     */
+    public function update(UpdateGroupRequest $request, Group $group): \Illuminate\Http\RedirectResponse
+    {
+        $group->update(['slug' => Str::slug($request->name)] + $request->validated());
+
+        cache()->forget('group:'.$group->id);
+
+        foreach (User::whereBelongsTo($group)->get() as $user) {
+            Unit3dAnnounce::addUser($user);
+        }
+
+        return to_route('staff.groups.index')
+            ->withSuccess('Group Was Updated Successfully!');
+    }
+}
